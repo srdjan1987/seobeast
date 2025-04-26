@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO Beast Analyzer</title>
+
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    body { font-family: 'Poppins', sans-serif; background: #f8f9fa; margin: 0; padding: 2rem; }
+    h1, h2, h3 { font-weight: 600; }
+    .container { display: flex; flex-direction: column; gap: 2rem; }
+    .layout { display: flex; flex-wrap: wrap; gap: 2rem; }
+    .editor-box, .score-box, .box, .inputs { background: white; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); padding: 20px; }
+    .editor-box { flex: 2; min-width: 700px; }
+    .score-box { flex: 1; min-width: 300px; position: sticky; top: 20px; }
+    #toolbar { margin-bottom: 10px; }
+    #editor { height: 400px; border: 1px solid #ccc; border-radius: 10px; }
+    input, select, button { padding: 10px; margin-top: 8px; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+    input:focus, select:focus { outline: none; border-color: #4CAF50; }
+    table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; }
+    th { background: #f7f7f7; }
+    #score-center { text-align: center; font-size: 30px; font-weight: bold; margin-top: 1rem; }
+    .outline-tree { background: #f9f9f9; border-radius: 10px; padding: 10px; margin-top: 1rem; max-height: 300px; overflow-y: auto; }
+    .outline-item { padding-left: 20px; }
+    .outline-item.h1 { font-weight: bold; color: #4CAF50; }
+    .outline-item.h2 { padding-left: 20px; }
+    .outline-item.h3 { padding-left: 40px; font-style: italic; }
+    .feature-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
+    .feature-buttons button { flex: 1 1 48%; background: #4CAF50; color: white; font-weight: bold; transition: 0.3s; }
+    .feature-buttons button:hover { background: #388e3c; }
+    #checklist li.pass { color: green; }
+    #checklist li.fail { color: red; }
+    #overlay, #aiSettingsPopup { display: none; }
+    .keyword-pill {
+      background: #4CAF50;
+      color: white;
+      padding: 5px 10px;
+      margin: 5px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .keyword-pill input {
+      background: transparent;
+      border: none;
+      color: white;
+      width: 100px;
+    }
+    .keyword-pill .remove {
+      margin-left: 5px;
+      cursor: pointer;
+    }
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255,255,255,0.8);
+      z-index: 9999;
+      font-size: 30px;
+      color: #4CAF50;
+      text-align: center;
+      padding-top: 20%;
+    }
+
+    .lsi-pill {
+  display: inline-block;
+  background: #e0f7fa;
+  color: #00695c;
+  margin: 5px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+.lsi-pill:hover {
+  background: #b2ebf2;
+}
+.lsi-pill.selected {
+  background: #4CAF50;
+  color: white;
+}
+
+    /* Add new styles for clicked content */
+    .ql-editor p.clicked, 
+    .ql-editor h1.clicked,
+    .ql-editor h2.clicked,
+    .ql-editor h3.clicked { 
+        background-color: rgba(76, 175, 80, 0.1);
+        transition: background-color 0.3s ease;
+        cursor: pointer;
+    }
+
+    /* Add styles for feature popups */
+    .feature-popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 2px 25px rgba(0,0,0,0.2);
+        z-index: 1000;
+        min-width: 300px;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .feature-popup-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+    }
+
+    .draggable-content {
+        padding: 10px;
+        margin: 5px 0;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        cursor: move;
+        transition: all 0.3s ease;
+        user-select: none;
+    }
+
+    .draggable-content:hover {
+        background: #e9e9e9;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .draggable-content.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    .ql-editor.drag-target {
+        position: relative;
+        background-color: rgba(76, 175, 80, 0.05);
+        border: 2px dashed #4CAF50;
+    }
+
+    .drag-indicator {
+        position: absolute;
+        height: 3px;
+        background: #4CAF50;
+        pointer-events: none;
+        z-index: 1000;
+        transition: top 0.1s ease;
+    }
+
+    .close-popup {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        cursor: pointer;
+        font-size: 20px;
+    }
+
+    .content-options {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 1rem;
+    }
+
+    .content-options h3 {
+        margin-top: 0;
+    }
+
+    .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .option-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .option-group label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .number-input {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .number-input button {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 5px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .number-input input {
+        width: 80px;
+        text-align: center;
+    }
+
+    .model-select {
+        width: 100%;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+    }
+
+    .generate-button {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+        margin-top: 1rem;
+    }
+
+    .generate-button:hover {
+        background: #388e3c;
+        transform: translateY(-2px);
+    }
+
+    .generate-button:active {
+        transform: translateY(0);
+    }
+
+    .generate-button.loading {
+        background: #888;
+        pointer-events: none;
+    }
+
+    /* Move LSI keywords section */
+    .lsi-section {
+        margin-bottom: 1rem;
+        padding: 15px;
+        border-radius: 10px;
+        transition: background-color 0.3s ease;
+    }
+
+    .lsi-section.drag-over {
+        background-color: rgba(76, 175, 80, 0.1);
+        border: 2px dashed #4CAF50;
+    }
+
+    .lsi-keyword {
+        display: inline-block;
+        margin: 5px;
+        padding: 8px 12px;
+        background: #e0f7fa;
+        color: #00695c;
+        border-radius: 20px;
+        cursor: move;
+        transition: all 0.2s ease;
+    }
+
+    .lsi-keyword:hover {
+        background: #b2ebf2;
+        transform: translateY(-2px);
+    }
+
+    .lsi-keyword.dragging {
+        opacity: 0.5;
+    }
+
+    /* Fluff Detection Styling */
+    .fluff-item {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+
+    .fluff-item p {
+        margin: 5px 0;
+    }
+
+    /* Compression Score Styling */
+    .compression-results {
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+    }
+
+    .compression-results ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .compression-results li {
+        margin: 5px 0;
+        color: #666;
+    }
+
+    /* Outline Analysis Styling */
+    .outline-analysis {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .outline-analysis h4 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+    }
+
+    .outline-analysis .current-outline {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .outline-analysis .current-outline ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .outline-analysis .current-outline li {
+        padding: 8px 12px;
+        margin: 5px 0;
+        background: white;
+        border-radius: 6px;
+        border-left: 3px solid #4CAF50;
+    }
+
+    .outline-analysis .analysis-content {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+    }
+
+    .outline-analysis .analysis-section {
+        margin-bottom: 15px;
+    }
+
+    .outline-analysis .analysis-section h5 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-size: 1rem;
+    }
+
+    .outline-analysis .recommendation {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 6px;
+        background: white;
+    }
+
+    .outline-analysis .recommendation.good {
+        border-left: 3px solid #4CAF50;
+    }
+
+    .outline-analysis .recommendation.warning {
+        border-left: 3px solid #FFC107;
+    }
+
+    .outline-analysis .recommendation.improvement {
+        border-left: 3px solid #2196F3;
+    }
+
+    /* Add styles for clickable LSI keywords */
+    .lsi-keyword.clickable {
+        cursor: pointer;
+        padding: 8px 12px;
+        margin: 5px;
+        background: #e0f7fa;
+        border-radius: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    .lsi-keyword.clickable:hover {
+        background: #b2ebf2;
+        transform: translateY(-2px);
+    }
+
+    .add-icon {
+        margin-left: 8px;
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    #checklist {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    #checklist li {
+        padding: 8px 12px;
+        margin: 4px 0;
+        border-radius: 4px;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    #checklist li.pass {
+        background: rgba(76, 175, 80, 0.1);
+        color: #2e7d32;
+    }
+
+    #checklist li.warning {
+        background: rgba(255, 193, 7, 0.1);
+        color: #f57c00;
+    }
+
+    #checklist li.fail {
+        background: rgba(244, 67, 54, 0.1);
+        color: #d32f2f;
+    }
+
+    #score-center {
+        text-align: center;
+        padding: 10px;
+    }
+
+    /* Improved SEO Analysis Setup UI */
+    .inputs {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+
+    .inputs h2 {
+        margin-bottom: 25px;
+        color: #2c3e50;
+    }
+
+    .seo-analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 25px;
+        margin-bottom: 25px;
+    }
+
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .input-group label {
+        font-weight: 600;
+        color: #34495e;
+        margin-bottom: 12px;
+        font-size: 0.95rem;
+    }
+
+    .input-group input,
+    .input-group select {
+        padding: 12px 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .input-group input:focus,
+    .input-group select:focus {
+        border-color: #4CAF50;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    }
+
+    .action-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 25px;
+    }
+
+    .action-button {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .action-button:hover {
+        background: #e9ecef;
+        transform: translateY(-2px);
+    }
+
+    .action-button.primary {
+        background: #4CAF50;
+        color: white;
+    }
+
+    .action-button.primary:hover {
+        background: #388e3c;
+    }
+
+    .metrics-panel {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .metric {
+        text-align: center;
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .metric label {
+        display: block;
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 5px;
+    }
+
+    .metric span {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .dragging {
+        opacity: 0.6;
+        cursor: move;
+    }
+
+    .drop-target {
+        border: 2px dashed #4CAF50 !important;
+        background-color: rgba(76, 175, 80, 0.1);
+    }
+
+    .drop-target * {
+        pointer-events: none;
+    }
+
+    .headline-option {
+        padding: 12px 15px;
+        margin: 8px 0;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    .headline-option:hover {
+        background: #e9ecef;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .headline-option .add-icon {
+        color: #4CAF50;
+        font-weight: bold;
+        font-size: 1.2em;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+    }
+
+  </style>
+</head>
+
+<body>
+<div id="loadingOverlay">Loading... Please wait 🔄</div>
+
+<div class="container">
+  <h1>🚀 SEO Beast Analyser</h1>
+
+  <!-- Add popup containers -->
+  <div class="feature-popup-overlay"></div>
+  
+  <div id="headlinesPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>AI Headlines</h3>
+    <div id="headlinesContent"></div>
+  </div>
+
+  <div id="topicClusterPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>Topic Clusters</h3>
+    <div id="topicClusterContent"></div>
+  </div>
+
+  <div id="outlineCheckPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>Outline Check</h3>
+    <div id="outlineCheckContent"></div>
+  </div>
+
+  <div id="fluffPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>Fluff Detection</h3>
+    <div id="fluffContent"></div>
+  </div>
+
+  <div id="compressionPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>Compression Score</h3>
+    <div id="compressionContent"></div>
+  </div>
+
+  <div id="lsiPopup" class="feature-popup">
+    <span class="close-popup">&times;</span>
+    <h3>LSI Keywords</h3>
+    <div id="lsiExpandContent"></div>
+  </div>
+
+  <div class="inputs">
+    <h2>🔑 SEO Analysis Setup</h2>
+    <div class="seo-analysis-grid">
+      <div class="input-group">
+        <label>Primary Keyword</label>
+        <input id="keyword" placeholder="e.g. best plumber perth" />
+      </div>
+      <div class="input-group">
+        <label>Page URL</label>
+        <input id="url" placeholder="https://yourdomain.com/page" />
+      </div>
+      <div class="input-group">
+        <label>Country</label>
+        <select id="country">
+          <option>Australia</option>
+          <option>United States</option>
+          <option>Canada</option>
+          <option>United Kingdom</option>
+        </select>
+      </div>
+    </div>
+  
+    <h3 style="margin-top:25px; margin-bottom:15px;">Secondary Keywords</h3>
+    <div id="keywordsContainer" style="margin-bottom:15px;"></div>
+    <div class="action-buttons">
+        <button onclick="addKeyword()" class="action-button">
+            <span>+</span> Add Keyword
+        </button>
+        <button onclick="analyze()" class="action-button primary">
+            <span>🔍</span> Analyze Page
+        </button>
+    </div>
+  </div>
+  
+
+  <!-- LSI Keywords Section -->
+  <div class="box lsi-section">
+    <h2>🔍 LSI Keywords</h2>
+    <div id="lsiKeywords"></div>
+  </div>
+
+  <div class="layout">
+    <div class="editor-box">
+      <h2>📝 SEO Content Editor</h2>
+      
+      <!-- Content Generation Options -->
+      <div class="content-options" id="contentOptions" style="display: none;">
+          <h3>Content Generation Options</h3>
+          <div class="options-grid">
+              <div class="option-group">
+                  <label>Word Count</label>
+                  <div class="number-input">
+                      <button onclick="decrementValue('wordCount')">-</button>
+                      <input type="number" id="wordCount" value="2950" min="1000" max="10000">
+                      <button onclick="incrementValue('wordCount')">+</button>
+                  </div>
+              </div>
+              <div class="option-group">
+                  <label>Headings</label>
+                  <div class="number-input">
+                      <button onclick="decrementValue('headings')">-</button>
+                      <input type="number" id="headings" value="9" min="3" max="15">
+                      <button onclick="incrementValue('headings')">+</button>
+                  </div>
+              </div>
+              <div class="option-group">
+                  <label>Paragraphs</label>
+                  <div class="number-input">
+                      <button onclick="decrementValue('paragraphs')">-</button>
+                      <input type="number" id="paragraphs" value="13" min="5" max="30">
+                      <button onclick="incrementValue('paragraphs')">+</button>
+                  </div>
+              </div>
+              <div class="option-group">
+                  <label>Images</label>
+                  <div class="number-input">
+                      <button onclick="decrementValue('images')">-</button>
+                      <input type="number" id="images" value="8" min="1" max="15">
+                      <button onclick="incrementValue('images')">+</button>
+                  </div>
+              </div>
+              <div class="option-group">
+                  <label>AI Model</label>
+                  <select id="aiModel" class="model-select">
+                      <option value="gpt-4">GPT-4 (High quality, longer content)</option>
+                      <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16K (Balanced)</option>
+                      <option value="gpt-4-32k">GPT-4 32K (Highest quality, longest content)</option>
+                  </select>
+              </div>
+          </div>
+          <button onclick="generateContent()" class="generate-button">Generate Content</button>
+      </div>
+
+      <div id="toolbar">
+        <select class="ql-header">
+          <option value="1">H1</option>
+          <option value="2">H2</option>
+          <option value="3">H3</option>
+          <option selected>Normal</option>
+        </select>
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+        <button class="ql-blockquote"></button>
+        <button class="ql-link"></button>
+        <button class="ql-image"></button>
+        <button class="ql-table"></button>
+      </div>
+      <div id="editor"></div>
+      <button onclick="showContentOptions()" class="generate-button" style="margin-top: 1rem;">
+        🤖 Generate SEO Content
+      </button>
+
+      <div class="feature-buttons">
+        <button onclick="generateHeadlines()">✨ AI Headlines</button>
+        <button onclick="buildTopicCluster()">🔗 Topic Clusters</button>
+        <button onclick="validateOutline()">🧠 Outline Check</button>
+        <button onclick="detectFluff()">🧼 Detect Fluff</button>
+        <button onclick="compressionScore()">📏 Compression Score</button>
+        <button onclick="expandLSI()">🔍 Expand LSI</button>
+        <button onclick="saveProject()">💾 Save Project</button>
+        <button onclick="loadProject()">📂 Load Project</button>
+      </div>
+    </div>
+
+    <div class="score-box">
+      <h2>📊 SEO Score</h2>
+      <canvas id="scoreChart" width="200" height="200"></canvas>
+      <div id="score-center">0/100</div>
+
+      <h3>✅ Checklist</h3>
+      <ul id="checklist"></ul>
+
+      <div class="outline-tree">
+        <h4>📚 Live Outline</h4>
+        <div id="outlineContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move competitor analysis to bottom -->
+  <div class="box">
+    <h2>📈 Competitor Analysis</h2>
+    <table id="competitorTable">
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Word Count</th>
+          <th>H1s</th>
+          <th>H2s</th>
+          <th>H3s</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="contentMetrics" class="metrics-panel">
+    <h3>Content Metrics</h3>
+    <div class="metrics-grid">
+        <div class="metric">
+            <label>Words</label>
+            <span id="wordCount">0</span>
+        </div>
+        <div class="metric">
+            <label>Headings</label>
+            <span id="headingCount">0</span>
+        </div>
+        <div class="metric">
+            <label>Paragraphs</label>
+            <span id="paragraphCount">0</span>
+        </div>
+        <div class="metric">
+            <label>Images</label>
+            <span id="imageCount">0</span>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let quill = new Quill('#editor', {
+    modules: {
+      toolbar: {
+        container: '#toolbar',
+        handlers: {
+          'table': function() {
+            let tableHTML = '<table style="width:100%; border-collapse: collapse; margin: 1rem 0;"><tr><td style="border: 1px solid #ddd; padding: 8px;">Column 1</td><td style="border: 1px solid #ddd; padding: 8px;">Column 2</td></tr><tr><td style="border: 1px solid #ddd; padding: 8px;">Data 1</td><td style="border: 1px solid #ddd; padding: 8px;">Data 2</td></tr></table>';
+            let range = this.quill.getSelection(true);
+            this.quill.clipboard.dangerouslyPasteHTML(range.index, tableHTML);
+          }
+        }
+      }
+    },
+    theme: 'snow'
+  });
+  
+  let tfidfKeywords = [], lsiKeywords = [], selectedLSI = [], secondaryKeywords = [], competitorStats = [];
+  let aiSettings = { words: 800, headings: 6, paragraphs: 10, images: 2 };
+  
+  quill.on('text-change', () => {
+    generateOutline();
+    realtimeScore();
+  });
+  
+  function addKeyword() {
+    const container = document.getElementById("keywordsContainer");
+    const pill = document.createElement("div");
+    pill.className = "keyword-pill";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Keyword";
+    input.oninput = updateSecondary;
+    const remove = document.createElement("span");
+    remove.className = "remove";
+    remove.innerText = "x";
+    remove.onclick = () => pill.remove();
+    pill.appendChild(input);
+    pill.appendChild(remove);
+    container.appendChild(pill);
+  }
+  
+  function updateSecondary() {
+    secondaryKeywords = Array.from(document.querySelectorAll("#keywordsContainer input"))
+      .map(el => el.value.trim())
+      .filter(Boolean);
+  }
+  
+  function analyze() {
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    loadingOverlay.style.display = 'block';
+    loadingOverlay.innerHTML = 'Analyzing page and competitors... Please wait 🔄';
+
+    const keyword = document.getElementById("keyword").value;
+    const url = document.getElementById("url").value;
+    const country = document.getElementById("country").value;
+    updateSecondary();
+  
+    window.pywebview.api.analyse({ 
+      keyword, 
+      url, 
+      country, 
+      secondary_keywords: secondaryKeywords 
+    })
+    .then(res => {
+      try {
+      const data = JSON.parse(res);
+        
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+
+        // Update UI with results
+      tfidfKeywords = data.tfidf_keywords;
+      lsiKeywords = data.lsi_keywords;
+      competitorStats = data.competitors;
+      selectedLSI = [];
+        
+      renderCompetitors();
+      renderLSI();
+      updateChecklist(data.score_reasons);
+      updateScore(data.score);
+      } catch (e) {
+        alert("Error parsing analysis results: " + e.message);
+      }
+    })
+    .catch(error => {
+      alert("Analysis failed: " + error);
+    })
+    .finally(() => {
+      loadingOverlay.style.display = 'none';
+    });
+  }
+  
+  function generateOutline() {
+    const editorContent = quill.root.innerHTML;
+    const parser = new DOMParser().parseFromString(editorContent, 'text/html');
+    const headings = parser.querySelectorAll('h1, h2, h3');
+    const outline = Array.from(headings).map(h => `<div class="outline-item ${h.tagName.toLowerCase()}">${h.innerText}</div>`).join('');
+    document.getElementById("outlineContent").innerHTML = outline;
+  }
+  
+  function realtimeScore() {
+    const keyword = document.getElementById("keyword").value;
+    if (!keyword) {
+        updateScore(0);
+        updateChecklist(["❌ Please enter a primary keyword"]);
+        return;
+    }
+
+    // Get editor content with proper HTML structure
+    const editorContent = quill.root.innerHTML;
+    const html = `
+        <html>
+        <head>
+            <title>${keyword}</title>
+            <meta name="description" content="${keyword}">
+        </head>
+        <body>
+            ${editorContent}
+        </body>
+        </html>
+    `;
+    
+    // Get all keywords
+    const allKeywords = [
+        keyword,
+        ...Array.from(document.querySelectorAll("#keywordsContainer input"))
+            .map(el => el.value.trim())
+            .filter(Boolean)
+    ];
+    
+    // Get selected LSI keywords
+    const selectedLSI = Array.from(document.querySelectorAll("#lsiKeywords .lsi-pill.selected"))
+        .map(el => [el.textContent.trim(), 1]);
+
+    // Call backend scoring
+    window.pywebview.api.score(html, tfidfKeywords, selectedLSI, allKeywords)
+        .then(([score, reasons]) => {
+      updateScore(score);
+      updateChecklist(reasons);
+            updateContentMetrics();
+        })
+        .catch(err => {
+            console.error('Scoring error:', err);
+            updateScore(0);
+            updateChecklist(["❌ Error calculating score"]);
+    });
+  }
+  
+  function updateScore(score) {
+    const ctx = document.getElementById("scoreChart").getContext("2d");
+    if (window.scoreChartInstance) window.scoreChartInstance.destroy();
+    
+    window.scoreChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Score', 'Remaining'],
+        datasets: [{
+          data: [score, 100 - score],
+                backgroundColor: [
+                    score >= 80 ? '#4CAF50' : score >= 60 ? '#FFC107' : '#F44336',
+                    '#eee'
+                ]
+        }]
+      },
+      options: {
+        cutout: '70%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            },
+            animation: {
+                duration: 300
+            }
+        }
+    });
+    
+    document.getElementById("score-center").innerHTML = `
+        <div>${score}/100</div>
+        <div style="font-size: 14px; color: ${score >= 80 ? '#4CAF50' : score >= 60 ? '#FFC107' : '#F44336'}">
+            ${score >= 80 ? '✨ Excellent' : score >= 60 ? '👍 Good' : '⚠️ Needs Work'}
+        </div>
+    `;
+  }
+  
+  function updateChecklist(reasons) {
+    const ul = document.getElementById("checklist");
+    ul.innerHTML = reasons.map(reason => {
+        const type = reason.includes('✅') ? 'pass' : reason.includes('⚠️') ? 'warning' : 'fail';
+        return `<li class="${type}">${reason}</li>`;
+    }).join('');
+  }
+  
+  function renderCompetitors() {
+    const tbody = document.querySelector("#competitorTable tbody");
+    tbody.innerHTML = '';
+    competitorStats.forEach(c => {
+      tbody.innerHTML += `<tr><td><a href="${c.url}" target="_blank">${c.domain}</a></td><td>${c.word_count}</td><td>${c.h1}</td><td>${c.h2}</td><td>${c.h3}</td></tr>`;
+    });
+  }
+  
+  function renderLSI() {
+    const el = document.getElementById("lsiKeywords");
+    el.innerHTML = '';
+    lsiKeywords.forEach(([term]) => {
+      const span = document.createElement("span");
+      span.textContent = term;
+      span.className = "lsi-pill";
+      span.onclick = () => span.classList.toggle("selected");
+      el.appendChild(span);
+    });
+  }
+  
+  function generateHeadlines() {
+    const keyword = document.getElementById("keyword").value;
+    if (!keyword) {
+        alert("Please enter a primary keyword first!");
+        return;
+    }
+
+    const content = document.getElementById('headlinesContent');
+    content.innerHTML = '<div class="loading">Generating headlines... ⌛</div>';
+    showPopup('headlinesPopup');
+
+    window.pywebview.api.generate_headline_suggestions(keyword).then(headlines => {
+        content.innerHTML = headlines.map(h => 
+            `<div class="headline-option" onclick="addHeadlineToEditor(this.textContent)">
+                ${h}
+            </div>`
+        ).join('');
+    });
+  }
+  
+  function addHeadlineToEditor(headline) {
+    const range = quill.getSelection(true);
+    quill.insertText(range.index, '\n', 'user');
+    quill.insertText(range.index + 1, headline, { header: 1 });
+    quill.insertText(range.index + headline.length + 1, '\n', 'user');
+    hideAllPopups();
+    setTimeout(() => {
+        generateOutline();
+        realtimeScore();
+        updateContentMetrics();
+    }, 100);
+  }
+  
+  function buildTopicCluster() {
+    const keyword = document.getElementById("keyword").value;
+    window.pywebview.api.build_topic_clusters(keyword).then(topics => {
+      const content = document.getElementById('topicClusterContent');
+      content.innerHTML = topics.map(t => 
+        `<div class="draggable-content">${t}</div>`
+      ).join('');
+      content.querySelectorAll('.draggable-content').forEach(makeDraggable);
+      showPopup('topicClusterPopup');
+    });
+  }
+  
+  function validateOutline() {
+    const headings = Array.from(quill.root.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+      .map(h => h.textContent.trim());
+    
+    if (headings.length === 0) {
+      alert("❌ No headings found. Please add some headings to validate.");
+      return;
+    }
+
+    window.pywebview.api.validate_outline(headings).then(analysis => {
+      const content = document.getElementById('outlineCheckContent');
+      
+      // Parse the analysis into sections
+      const sections = analysis.split('\n\n').filter(Boolean);
+      const formattedSections = sections.map(section => {
+        if (section.startsWith('###')) {
+          // This is a main heading
+          return `<div class="analysis-section">
+            <h5>${section.replace('### ', '')}</h5>
+          </div>`;
+        } else {
+          // These are recommendations
+          const recommendations = section.split('\n').filter(Boolean);
+          return recommendations.map(rec => {
+            let type = 'improvement';
+            if (rec.includes('Good') || rec.includes('Appropriate')) type = 'good';
+            if (rec.includes('Consider') || rec.includes('could be')) type = 'warning';
+            return `<div class="recommendation ${type}">${rec}</div>`;
+          }).join('');
+        }
+      }).join('');
+
+      content.innerHTML = `
+        <div class="outline-analysis">
+          <h4>Current Outline</h4>
+          <div class="current-outline">
+            <ul>
+              ${headings.map(h => `<li>${h}</li>`).join('')}
+            </ul>
+          </div>
+          <h4>Analysis</h4>
+          <div class="analysis-content">
+            ${formattedSections}
+          </div>
+        </div>
+      `;
+      showPopup('outlineCheckPopup');
+    });
+  }
+  
+  function detectFluff() {
+    const text = quill.root.innerText;
+    window.pywebview.api.detect_fluff(text).then(findings => {
+        const content = document.getElementById('fluffContent');
+        if (findings.length === 0) {
+            content.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <h4 style="color: #4CAF50;">🎉 Great job!</h4>
+                    <p>No fluff content detected in your writing.</p>
+                </div>`;
+        } else {
+            content.innerHTML = findings.map(f => `
+                <div class="fluff-item draggable-content">
+                    <p><strong>Fluff Phrase:</strong> "${f.phrase}"</p>
+                    <p><strong>Context:</strong> ${f.context}</p>
+                    <p><strong>Suggestion:</strong> ${f.suggestion}</p>
+                </div>
+            `).join('');
+        }
+        showPopup('fluffPopup');
+    });
+  }
+  
+  function compressionScore() {
+    const text = quill.root.innerText;
+    window.pywebview.api.compression_score(text).then(score => {
+      const content = document.getElementById('compressionContent');
+      const html = `
+        <div class="compression-results">
+          <p><strong>Compression Ratio:</strong> ${score.compression_ratio}</p>
+          <p><strong>Average Word Length:</strong> ${score.avg_word_length}</p>
+          <p><strong>Average Sentence Length:</strong> ${score.avg_sentence_length}</p>
+          <h4>Suggestions:</h4>
+          <ul>
+            ${score.suggestions.map(s => `<li>${s}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+      content.innerHTML = html;
+      showPopup('compressionPopup');
+    });
+  }
+  
+  function expandLSI() {
+    const text = quill.root.innerText;
+    window.pywebview.api.expand_lsi_keywords(text).then(lsi => {
+      const content = document.getElementById('lsiExpandContent');
+      const html = lsi.map(([k]) => `
+        <div class="lsi-keyword clickable" onclick="addToLSISection('${k.replace(/'/g, "\\'")}')">
+          ${k}
+          <span class="add-icon">+</span>
+        </div>
+      `).join('');
+      content.innerHTML = html;
+      showPopup('lsiPopup');
+    });
+  }
+  
+  function addToLSISection(keyword) {
+    const lsiSection = document.getElementById('lsiKeywords');
+    // Check if keyword already exists
+    const existingPills = Array.from(lsiSection.querySelectorAll('.lsi-pill'));
+    if (!existingPills.some(pill => pill.textContent.trim() === keyword)) {
+      const pill = document.createElement('span');
+      pill.className = 'lsi-pill';
+      pill.textContent = keyword;
+      pill.onclick = () => pill.classList.toggle('selected');
+      lsiSection.appendChild(pill);
+    }
+  }
+  
+  function generateAI() {
+    const keyword = document.getElementById("keyword").value;
+    const selectedTerms = Array.from(document.querySelectorAll(".lsi-pill.selected")).map(el => [el.textContent]);
+    window.pywebview.api.generate_content({
+      keyword: keyword,
+      lsi_keywords: selectedTerms.length ? selectedTerms : lsiKeywords,
+      settings: aiSettings
+    }).then(html => {
+      quill.root.innerHTML = html;
+      realtimeScore();
+      generateOutline();
+    });
+  }
+  
+  function saveProject() {
+    const project = {
+        keyword: document.getElementById("keyword").value,
+        url: document.getElementById("url").value,
+        country: document.getElementById("country").value,
+        content: quill.root.innerHTML,
+        lsi: lsiKeywords,
+        competitors: competitorStats,
+        secondaryKeywords: Array.from(document.querySelectorAll("#keywordsContainer input")).map(el => el.value)
+    };
+
+    // Create a Blob and trigger download
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project_${new Date().toISOString().split('T')[0]}.seobst`;
+    document.body.appendChild(a);  // Required for Firefox
+    a.click();
+    document.body.removeChild(a);  // Clean up
+    window.URL.revokeObjectURL(url);
+  }
+  
+  function loadProject() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.seobst';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file.name.endsWith('.seobst')) {
+            alert('Please select a valid .seobst file');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const project = JSON.parse(event.target.result);
+                
+                // Restore all project data
+                document.getElementById("keyword").value = project.keyword || '';
+                document.getElementById("url").value = project.url || '';
+                document.getElementById("country").value = project.country || 'Australia';
+                quill.root.innerHTML = project.content || '';
+                lsiKeywords = project.lsi || [];
+                competitorStats = project.competitors || [];
+                
+                // Restore secondary keywords
+                const keywordsContainer = document.getElementById("keywordsContainer");
+                keywordsContainer.innerHTML = '';
+                if (project.secondaryKeywords) {
+                    project.secondaryKeywords.forEach(kw => {
+                        const pill = document.createElement("div");
+                        pill.className = "keyword-pill";
+                        const input = document.createElement("input");
+                        input.type = "text";
+                        input.value = kw;
+                        input.placeholder = "Keyword";
+                        input.oninput = updateSecondary;
+                        const remove = document.createElement("span");
+                        remove.className = "remove";
+                        remove.innerText = "x";
+                        remove.onclick = () => pill.remove();
+                        pill.appendChild(input);
+                        pill.appendChild(remove);
+                        keywordsContainer.appendChild(pill);
+                    });
+                }
+                
+                // Update UI
+                renderLSI();
+                renderCompetitors();
+                generateOutline();
+                realtimeScore();
+                updateContentMetrics();
+                
+                alert("Project loaded successfully!");
+            } catch (err) {
+                alert("Error loading project: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
+    document.body.removeChild(input);  // Clean up
+  }
+
+  // Add click handler for editor content
+  quill.on('editor-change', function() {
+    const editor = document.querySelector('.ql-editor');
+    editor.querySelectorAll('p, h1, h2, h3').forEach(element => {
+      element.addEventListener('click', function() {
+        // Remove clicked class from all elements
+        editor.querySelectorAll('.clicked').forEach(el => el.classList.remove('clicked'));
+        // Add clicked class to current element
+        this.classList.add('clicked');
+      });
+    });
+  });
+
+  // Popup management functions
+  function showPopup(popupId) {
+    document.querySelector('.feature-popup-overlay').style.display = 'block';
+    document.getElementById(popupId).style.display = 'block';
+  }
+
+  function hideAllPopups() {
+    document.querySelector('.feature-popup-overlay').style.display = 'none';
+    document.querySelectorAll('.feature-popup').forEach(popup => {
+      popup.style.display = 'none';
+    });
+  }
+
+  // Add event listeners for popup close buttons
+  document.querySelectorAll('.close-popup').forEach(button => {
+    button.addEventListener('click', hideAllPopups);
+  });
+  document.querySelector('.feature-popup-overlay').addEventListener('click', hideAllPopups);
+
+  // Make content draggable
+  function makeDraggable(element) {
+    element.draggable = true;
+    element.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/html', element.innerHTML);
+      element.classList.add('dragging');
+    });
+    element.addEventListener('dragend', () => {
+      element.classList.remove('dragging');
+      document.querySelector('.ql-editor').classList.remove('drag-target');
+    });
+  }
+
+  // Enhanced drag and drop functionality
+  function initializeDragAndDrop() {
+    const editor = quill.root;
+    let dropIndicator = document.createElement('div');
+    dropIndicator.className = 'drag-indicator';
+    document.body.appendChild(dropIndicator);
+    
+    // Handle draggable elements
+    document.querySelectorAll('.draggable-content').forEach(el => {
+      el.draggable = true;
+      el.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/html', el.innerHTML);
+        el.classList.add('dragging');
+      });
+      el.addEventListener('dragend', () => {
+        el.classList.remove('dragging');
+        editor.classList.remove('drag-target');
+        dropIndicator.style.display = 'none';
+      });
+    });
+    
+    // Editor drop zone
+    editor.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      editor.classList.add('drag-target');
+      
+      // Get drop position
+      const rect = editor.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      
+      // Show drop indicator
+      dropIndicator.style.display = 'block';
+      dropIndicator.style.top = `${e.clientY}px`;
+      dropIndicator.style.left = `${rect.left}px`;
+      dropIndicator.style.width = `${rect.width}px`;
+    });
+    
+    editor.addEventListener('dragleave', (e) => {
+      if (!editor.contains(e.relatedTarget)) {
+        editor.classList.remove('drag-target');
+        dropIndicator.style.display = 'none';
+      }
+    });
+    
+    editor.addEventListener('drop', (e) => {
+      e.preventDefault();
+      editor.classList.remove('drag-target');
+      dropIndicator.style.display = 'none';
+      
+      const html = e.dataTransfer.getData('text/html');
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      
+      if (range) {
+        const index = getQuillIndex(range);
+        if (index !== -1) {
+          quill.insertText(index, '\n', 'user');
+          quill.clipboard.dangerouslyPasteHTML(index + 1, html);
+          quill.insertText(index + html.length + 1, '\n', 'user');
+          updateContentMetrics();
+          realtimeScore();
+        }
+      }
+    });
+  }
+
+  function getQuillIndex(range) {
+    const [leaf, offset] = quill.getLeaf(quill.getSelection()?.index || 0);
+    return leaf ? quill.getIndex(leaf) + offset : -1;
+  }
+
+  function showContentOptions() {
+    const options = document.getElementById('contentOptions');
+    options.style.display = options.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function incrementValue(id) {
+    const input = document.getElementById(id);
+    input.value = Math.min(parseInt(input.value) + 1, parseInt(input.max));
+  }
+
+  function decrementValue(id) {
+    const input = document.getElementById(id);
+    input.value = Math.max(parseInt(input.value) - 1, parseInt(input.min));
+  }
+
+  function generateContent() {
+    const button = document.querySelector('.generate-button');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    // Get the keyword
+    const keyword = document.getElementById("keyword").value;
+    if (!keyword) {
+        alert("Please enter a primary keyword first!");
+        return;
+    }
+
+    // Show loading state
+    button.classList.add('loading');
+    button.textContent = 'Generating...';
+    loadingOverlay.style.display = 'block';
+    loadingOverlay.innerHTML = 'Generating SEO content... This may take a few minutes 🔄';
+
+    // Get selected LSI keywords
+    const selectedLSI = Array.from(document.querySelectorAll("#lsiKeywords .lsi-pill.selected"))
+        .map(el => [el.textContent.trim(), 1]);
+
+    // Get content generation settings
+    const params = {
+        keyword: keyword,
+        url: document.getElementById("url").value,
+        lsi_keywords: selectedLSI.length > 0 ? selectedLSI : lsiKeywords,
+        settings: {
+            words: parseInt(document.getElementById("wordCount").value),
+            headings: parseInt(document.getElementById("headings").value),
+            paragraphs: parseInt(document.getElementById("paragraphs").value),
+            images: parseInt(document.getElementById("images").value),
+            model: document.getElementById("aiModel").value
+        }
+    };
+
+    // Generate content with progress updates
+    window.pywebview.api.generate_content(params)
+        .then(html => {
+            if (html.includes("Error")) {
+                alert(html.replace(/<\/?p>/g, ''));
+    } else {
+                quill.root.innerHTML = html;
+                // Force immediate score update
+                setTimeout(() => {
+                    generateOutline();
+                    realtimeScore();
+                    updateContentMetrics();
+                }, 100);
+            }
+        })
+        .catch(error => {
+            alert("Error generating content: " + error);
+        })
+        .finally(() => {
+            // Reset UI state
+            button.classList.remove('loading');
+            button.textContent = '🤖 Generate SEO Content';
+            loadingOverlay.style.display = 'none';
+            document.getElementById('contentOptions').style.display = 'none';
+        });
+  }
+
+  // Ensure score updates on all content changes
+  quill.on('text-change', debounce(() => {
+    generateOutline();
+    realtimeScore();
+  }, 300));
+
+  // Add score update triggers
+  document.getElementById('keyword').addEventListener('input', debounce(realtimeScore, 300));
+  document.querySelectorAll('#keywordsContainer').forEach(container => {
+    container.addEventListener('input', debounce(realtimeScore, 300));
+  });
+
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Keyboard shortcuts
+  quill.keyboard.addBinding({
+    key: 'B',
+    shortKey: true
+  }, function(range) {
+    quill.formatText(range, 'bold', !quill.getFormat(range).bold);
+    realtimeScore();
+  });
+
+  quill.keyboard.addBinding({
+    key: 'I',
+    shortKey: true
+  }, function(range) {
+    quill.formatText(range, 'italic', !quill.getFormat(range).italic);
+    realtimeScore();
+  });
+
+  // Fix link creation in editor
+  quill.keyboard.addBinding({
+    key: 'K',
+    shortKey: true
+  }, function(range) {
+    const url = prompt('Enter URL:');
+    if (url) {
+      quill.formatText(range, 'link', url);
+      realtimeScore();
+    }
+  });
+
+  // Add link button handler
+  document.querySelector('.ql-link').addEventListener('click', () => {
+    const range = quill.getSelection();
+    if (range) {
+      const url = prompt('Enter URL:');
+      if (url) {
+        quill.formatText(range, 'link', url);
+        realtimeScore();
+      }
+    }
+  });
+
+  // Add all necessary event listeners for real-time updates
+  function initializeRealtimeScoring() {
+    // Content changes
+    quill.on('text-change', debounce(realtimeScore, 500));
+
+    // Keyword changes
+    document.getElementById('keyword').addEventListener('input', debounce(realtimeScore, 500));
+    
+    // Secondary keywords container
+    document.getElementById('keywordsContainer').addEventListener('input', debounce(realtimeScore, 500));
+    
+    // LSI keyword selection
+    document.getElementById('lsiKeywords').addEventListener('click', (e) => {
+        if (e.target.classList.contains('lsi-pill')) {
+            setTimeout(realtimeScore, 100);
+        }
+    });
+  }
+
+  // Initialize scoring system
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeRealtimeScoring();
+    realtimeScore(); // Initial score
+  });
+
+  function updateContentMetrics() {
+    const editor = quill.root;
+    
+    // Count words (excluding empty spaces)
+    const text = editor.textContent || "";
+    const wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    document.getElementById('wordCount').textContent = wordCount;
+    
+    // Count headings
+    const headings = editor.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    document.getElementById('headingCount').textContent = headings.length;
+    
+    // Count non-empty paragraphs
+    const paragraphs = Array.from(editor.querySelectorAll('p')).filter(p => p.textContent.trim().length > 0);
+    document.getElementById('paragraphCount').textContent = paragraphs.length;
+    
+    // Count images
+    const images = editor.querySelectorAll('img');
+    document.getElementById('imageCount').textContent = images.length;
+  }
+  </script>
+  
+  </body>
+  </html>
