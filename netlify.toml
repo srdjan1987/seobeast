@@ -1,5 +1,5 @@
 [build]
-  command = "pip install -r requirements.txt"
+  command = "pip install -r requirements.txt && npm install --prefix frontend && npm run build --prefix frontend"
   publish = "frontend/build"
 
 [build.environment]
